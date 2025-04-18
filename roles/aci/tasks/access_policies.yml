@@ -1,0 +1,97 @@
+- name: Set ACI connection parameters
+  ansible.builtin.set_fact:
+    aci_login: &aci_login
+      host: "{{ apic }}"
+      username: "{{ aci_username }}"
+      password: "{{ aci_password }}"
+      validate_certs: "{{ aci_validate_certs }}"
+
+- name: Deploy standalone leaf profiles
+  cisco.aci.aci_switch_policy_leaf_profile:
+    <<: *aci_login
+    leaf_profile: "LF{{ item.id }}_SwProf"
+    state: present
+  loop: "{{ aci_leaves }}"
+  loop_control:
+    label: "LF{{ item.id }}_SwProf"
+
+# This task will often fail due to overlapping node blocks in a brown field deployment
+# this is because ACI will assign a random name to a manually created node block
+# therefore this task should be skipped if this is causing failures
+- name: Deploy standalone leaf selectors
+  cisco.aci.aci_switch_leaf_selector:
+    <<: *aci_login
+    leaf_profile: "LF{{ item.id }}_SwProf"
+    leaf: "LF{{ item.id }}_SwSel"
+    leaf_node_blk: '2'
+    from: "{{ item.id }}"
+    to: "{{ item.id }}"
+    state: present
+  loop: "{{ aci_leaves }}"
+  loop_control:
+    label: "LF{{ item.id }}_SwSel"
+  tags: 'node_blocks'
+
+- name: Deploy standalone leaf interface selector profiles
+  cisco.aci.aci_interface_policy_leaf_profile:
+    <<: *aci_login
+    interface_profile: "LF{{ item.id }}_IntProf"
+    type: leaf
+    state: present
+  loop: "{{ aci_leaves }}"
+  loop_control:
+    label: "LF{{ item.id }}_IntProf"
+
+- name: Deploy standalone interface selector profile to leaf profile associations
+  cisco.aci.aci_interface_selector_to_switch_policy_leaf_profile:
+    <<: *aci_login
+    leaf_profile: "LF{{ item.id }}_SwProf"
+    interface_selector: "LF{{ item.id }}_IntProf"
+    state: present
+  loop: "{{ aci_leaves }}"
+  loop_control:
+    label: "LF{{ item.id }}_SwProf -> LF{{ item.id }}_IntProf"
+
+- name: Deploy VPC leaf profiles
+  cisco.aci.aci_switch_policy_leaf_profile:
+    <<: *aci_login
+    leaf_profile: "VPC_LF{{ item.leaves | join('_') }}_SwProf"
+    state: present
+  loop: "{{ aci_vpc_pairs }}"
+  loop_control:
+    label: "VPC_LF{{ item.leaves | join('_') }}_SwProf"
+
+# Same as above
+- name: Deploy VPC leaf selectors
+  cisco.aci.aci_switch_leaf_selector:
+    <<: *aci_login
+    leaf_profile: "VPC_LF{{ item.leaves | join('_') }}_SwProf"
+    leaf: "VPC_LF{{ item.leaves | join('_') }}_SwSel"
+    leaf_node_blk: '2'
+    from: "{{ item.leaves[0] }}"
+    to: "{{ item.leaves[1] }}"
+    state: present
+  loop: "{{ aci_vpc_pairs }}"
+  loop_control:
+    label: "VPC_LF{{ item.leaves | join('_') }}_SwSel"
+  tags: 'node_blocks'
+
+- name: Deploy VPC leaf interface profiles
+  cisco.aci.aci_interface_policy_leaf_profile:
+    <<: *aci_login
+    interface_profile: "VPC_LF{{ item.leaves | join('_') }}_IntProf"
+    type: leaf
+    state: present
+  loop: "{{ aci_vpc_pairs }}"
+  loop_control:
+    label: "VPC_LF{{ item.leaves | join('_') }}_IntProf"
+
+- name: Deploy VPC interface selector profile to leaf profile associations
+  cisco.aci.aci_interface_selector_to_switch_policy_leaf_profile:
+    <<: *aci_login
+    leaf_profile: "VPC_LF{{ item.leaves | join('_') }}_SwProf"
+    interface_selector: "VPC_LF{{ item.leaves | join('_') }}_IntProf"
+    state: present
+  loop: "{{ aci_vpc_pairs }}"
+  loop_control:
+    label: "VPC_LF{{ item.leaves | join('_') }}_SwProf <-> VPC_LF{{ item.leaves | join('_') }}_IntProf"

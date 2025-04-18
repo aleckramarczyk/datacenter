@@ -1,0 +1,21 @@
+aci_default_interface_policy_group: ACC_Auto_IntPolGrp
+aci_default_tenant: TEP_DC
+aci_default_ap: AP_DC
+aci_default_deploy_immediacy: immediate
+aci_default_interface_description: ''
+aci_default_link_level_policy: 'LnkSpd_Auto_IntPol'
+aci_default_cdp_policy: 'CDP_Enabled'
+aci_default_lldp_policy: 'LLDP_Enabled'
+aci_default_port_channel_policy: 'LACP_Active'
+
+aci_access_port_roles:
+  unused:
+    description: 'Unused Access Port'
+    enabled: false
+
+aci_access_ports: []
+aci_vpcs: []
+
+aci_leaves: []
+
+aci_vpc_pairs: []

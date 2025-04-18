@@ -1,0 +1,215 @@
+- name: Set ACI connection parameters
+  ansible.builtin.set_fact:
+    aci_login: &aci_login
+      host: "{{ apic }}"
+      username: "{{ aci_username }}"
+      password: "{{ aci_password }}"
+      validate_certs: "{{ aci_validate_certs }}"
+
+- name: Debug access configs
+  ansible.builtin.debug:
+    var: aci_access_configs
+
+- name: Parse Access Configs
+  ansible.builtin.set_fact:
+    filtered_access_configs: "{{ aci_access_configs | tep.dc.access_config_filter }}"
+
+- name: Deploy interface selectors
+  cisco.aci.aci_access_port_to_interface_policy_leaf_profile:
+    <<: *aci_login
+    leaf_interface_profile: "LF{{ item.leaf }}_IntProf"
+    access_port_selector: "E{{ item.module }}_{{ item.port }}_IntSel"
+    interface_type: switch_port
+    leaf_port_blk: "2"
+    from_port: "{{ item.port }}"
+    to_port: "{{ item.port }}"
+    policy_group: "{{ item.policy_group | default(aci_default_interface_policy_group, true) }}"
+    state: "{{ item.state }}"
+  loop: "{{ filtered_access_configs.access_ports }}"
+  loop_control:
+    label: "{{ item.name }}: E{{ item.module }}_{{ item.port }}_IntSel"
+
+- name: Set interface descriptions
+  cisco.aci.aci_interface_description:
+    <<: *aci_login
+    pod_id: "{{ item.pod }}"
+    node_id: "{{ item.leaf }}"
+    interface: "{{ item.interface }}"
+    description: "{{ item.description | default(aci_default_interface_description, true) }}"
+    node_type: leaf
+    state: present
+  loop: "{{ filtered_access_configs.access_ports }}"
+  loop_control:
+    label: "{{ item.name }}: {{ item.description | default(aci_default_interface_description, true) }}"
+
+- name: Disable interfaces
+  cisco.aci.aci_interface_blacklist:
+    <<: *aci_login
+    pod_id: "{{ item.pod }}"
+    node_id: "{{ item.leaf }}"
+    interface: "{{ item.interface }}"
+    state: present
+  loop: "{{ filtered_access_configs.access_ports }}"
+  when: not item.enabled
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable interfaces
+  cisco.aci.aci_interface_blacklist:
+    <<: *aci_login
+    pod_id: "{{ item.pod }}"
+    node_id: "{{ item.leaf }}"
+    interface: "{{ item.interface }}"
+    state: absent
+  loop: "{{ filtered_access_configs.access_ports }}"
+  when: item.enabled
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Enable locator LED
+  cisco.aci.aci_rest:
+    <<: *aci_login
+    method: post
+    path: /api/node/mo/topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action.json
+    content:
+      actionLSubj:
+        attributes:
+          dn: topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action/lsubj-[{{ item.phys_dn }}]
+          oDn: "{{ item.phys_dn }}"
+        children:
+          - l1PhysIfLocateLTask:
+              attributes:
+                dn: "topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action/lsubj-[{{ item.phys_dn }}]/l1PhysIfLocateLTask"
+                "adminSt": "start"
+              children: []
+  loop: "{{ filtered_access_configs.access_ports }}"
+  when: item.locate
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Disable locator LED
+  cisco.aci.aci_rest:
+    <<: *aci_login
+    method: post
+    path: /api/node/mo/topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action.json
+    content:
+      actionLSubj:
+        attributes:
+          dn: topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action/lsubj-[{{ item.phys_dn }}]
+          oDn: "{{ item.phys_dn }}"
+        children:
+          - l1PhysIfLocateLTask:
+              attributes:
+                dn: "topology/pod-{{ item.pod }}/node-{{ item.leaf }}/sys/action/lsubj-[{{ item.phys_dn }}]/l1PhysIfLocateLTask"
+                "adminSt": "stop"
+              children: []
+  loop: "{{ filtered_access_configs.access_ports }}"
+  when: not item.locate
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Deploy VPC Interface Policy Groups
+  cisco.aci.aci_interface_policy_leaf_policy_group:
+    <<: *aci_login
+    policy_group: "{{ item.interface_policy_group.name }}"
+    lag_type: node
+    link_level_policy: "{{ item.interface_policy_group.link_level_policy | default(aci_default_link_level_policy, true) }}"
+    cdp_policy: "{{ item.interface_policy_group.cdp_policy | default(aci_default_cdp_policy, true) }}"
+    lldp_policy: "{{ item.interface_policy_group.lldp_policy | default(aci_default_cdp_policy, true) }}"
+    port_channel_policy: "{{ item.interface_policy_group.port_channel_policy | default(aci_default_port_channel_policy, true) }}"
+    state: "{{ item.state }}"
+  loop: "{{ filtered_access_configs.vpcs }}"
+  loop_control:
+    label: "{{ item.name }}: {{ item.interface_policy_group.name }}"
+
+- name: Deploy VPC interface selectors
+  cisco.aci.aci_access_port_to_interface_policy_leaf_profile:
+    <<: *aci_login
+    interface_profile: "VPC_LF{{ aci_vpc_pairs | selectattr('id', 'equalto', item.vpc_id) | map(attribute='leaves') | first | join('_') }}_IntProf"
+    access_port_selector: "E{{ item.module }}_{{ item.port }}_IntSel"
+    interface_type: vpc
+    leaf_port_blk: "2"
+    from_card: "{{ item.module }}"
+    to_card: "{{ item.module }}"
+    from_port: "{{ item.port }}"
+    to_port: "{{ item.port }}"
+    policy_group: "{{ item.interface_policy_group }}"
+    state: "{{ item.state }}"
+  loop: "{{ filtered_access_configs.vpc_ports }}"
+  loop_control:
+    label: "{{ item.name }}: E{{ item.module }}_{{ item.port }}_IntSel"
+
+- name: Deploy switchport static EPG bindings
+  cisco.aci.aci_static_binding_to_epg:
+    <<: *aci_login
+    tenant: "{{ item.tenant | default(aci_default_tenant, true) }}"
+    ap: "{{ item.ap | default(aci_default_ap, true) }}"
+    epg: "{{ item.epg }}"
+    interface_type: "{{ item.interface_type }}"
+    pod: "{{ item.pod }}"
+    leafs: "{{ item.leafs }}"
+    interface: "{{ item.interface }}"
+    deploy_immediacy: "{{ item.deploy_immediacy | default(aci_default_deploy_immediacy, true) }}"
+    encap_id: "{{ item.encap }}"
+    interface_mode: "{{ item.interface_mode }}"
+    state: "{{ item.state }}"
+  loop: "{{ filtered_access_configs.static_epg_bindings }}"
+  when: item.interface_type == 'switch_port'
+  loop_control:
+    label: "{{ item.epg }} -> {{ item.pod }}/{{ item.leafs }}/{{ item.interface }}"
+
+- name: Deploy VPC static EPG bindings
+  cisco.aci.aci_static_binding_to_epg:
+    <<: *aci_login
+    tenant: "{{ item.tenant | default(aci_default_tenant, true) }}"
+    ap: "{{ item.ap | default(aci_default_ap, true) }}"
+    epg: "{{ item.epg }}"
+    interface_type: "{{ item.interface_type }}"
+    pod: "{{ aci_leaves | selectattr('vpc_id', 'equalto', item.leafs | int) | map(attribute='pod') | first }}"
+    leafs: "{{ aci_vpc_pairs | selectattr('id', 'equalto', item.leafs | int) | map(attribute='leaves') | first | join(',') }}"
+    interface: "{{ item.interface }}"
+    deploy_immediacy: "{{ item.deploy_immediacy | default(aci_default_deploy_immediacy, true) }}"
+    encap_id: "{{ item.encap }}"
+    interface_mode: "{{ item.interface_mode }}"
+    state: "{{ item.state }}"
+  loop: "{{ filtered_access_configs.static_epg_bindings }}"
+  when: item.interface_type == 'vpc'
+  loop_control:
+    label: >-
+      {{ item.tenant | default(aci_default_tenant, true) }}/
+      {{ item.ap | default(aci_default_ap, true) }}/
+      {{ item.epg }} -> {{ item.pod }}/
+      {{ item.leafs }}/{{ item.interface }}
+      (mode: {{ item.interface_mode }},
+      encap: {{ item.encap }},
+      deploy_immediacy: {{ item.deploy_immediacy | default(aci_default_deploy_immediacy, true) }})
+
+- name: Set VPC interface descriptions part 1
+  cisco.aci.aci_interface_description:
+    <<: *aci_login
+    pod_id: "{{ aci_leaves | selectattr('id', 'equalto', item.vpc_id | int) | map(attribute='pod') | first }}"
+    node_id: "{{ aci_vpc_pairs | selectattr('id', 'equalto', item.vpc_id | int) | map(attribute='leaves') | first | first }}"
+    interface: "{{ item.module }}/{{ item.port }}"
+    description: "{{ item.description | default(aci_default_interface_description, true) }}"
+    node_type: leaf
+  loop: "{{ filtered_access_configs.vpc_ports }}"
+  loop_control:
+    label: >-
+      {{ item.description | default(aci_default_interface_description, true) }}
+      ({{ aci_vpc_pairs | selectattr('id', 'equalto', item.vpc_id | int)
+      | map(attribute='leaves') | first | last }}/{{ item.module }}/{{ item.port }})
+
+- name: Set VPC interface descriptions part 2
+  cisco.aci.aci_interface_description:
+    <<: *aci_login
+    pod_id: "{{ aci_leaves | selectattr('id', 'equalto', item.vpc_id | int) | map(attribute='pod') | first }}"
+    node_id: "{{ aci_vpc_pairs | selectattr('id', 'equalto', item.vpc_id | int) | map(attribute='leaves') | first | last }}"
+    interface: "{{ item.module }}/{{ item.port }}"
+    description: "{{ item.description | default(aci_default_interface_description, true) }}"
+    node_type: leaf
+  loop: "{{ filtered_access_configs.vpc_ports }}"
+  loop_control:
+    label: >-
+      {{ item.description | default(aci_default_interface_description, true) }}
+      ({{ aci_vpc_pairs | selectattr('id', 'equalto', item.vpc_id | int)
+      | map(attribute='leaves') | first | last }}/{{ item.module }}/{{ item.port }})

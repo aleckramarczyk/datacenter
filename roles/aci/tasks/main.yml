@@ -1,0 +1,11 @@
+---
+# tasks file for aci
+- name: Deploy access policies
+  ansible.builtin.include_tasks: access_policies.yml
+
+- name: Configure access ports
+  tags: configure_access_ports
+  ansible.builtin.include_tasks:
+    file: access_ports.yml
+    apply:
+      tags: configure_access_ports
