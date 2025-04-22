@@ -1,0 +1,53 @@
+---
+- name: CI Pipeline
+  become: True
+  hosts: builder
+  gather_facts: False
+  vars:
+    git_repo: 'git.uns.co/InformationServices/tep_dc.git'
+    git_branch: 'main'
+    build_dir: '/tmp/tep_dc_build'
+    galaxy_hub: 'tusldanshub01.unisource.corp'
+    collection_namespace: 'tep'
+    collection_name: 'dc'
+    collection_version: '1.0.0'
+
+  tasks:
+    - name: Install dependencies
+      ansible.builtin.package:
+        name:
+          - git
+          - ansible-core
+          - ansible-builder
+          - python3-devel
+        state: present
+      tags: setup
+
+    - name: Set vars
+      set_fact: 
+        git_url: 'https://{{ git_user| urlencode }}:{{ git_pass | urlencode }}@{{ git_repo }}'
+    
+    - name: Clone repo
+      ansible.builtin.git:
+        repo: "{{ git_url }}"
+        dest: "{{ build_dir }}"
+        version: "{{ git_branch }}"
+        force: yes
+    
+    - name: Build collection
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection build --force
+        chdir: "{{ build_dir }}"
+      register: build_result
+      failed_when: build_result.rc != 0
+    
+    - name: Publish collection
+      ansible.builtin.command:
+        cmd: ansible-galaxy collection publish {{ build_dir }}/{{ collection_namespace }}-{{ collection_name }}-{{ collection_version }}.tar.gz -s https://{{ galaxy_hub }}/api/galaxy --api-key {{ galaxy_api_key }}
+        chdir: "{{ build_dir }}"
+      tags: publish
+    
+    - name: Build execution environment
+      ansible.builtin.command:
+        cmd: ansible-builder build --tag {{ galaxy_hub }}/tep_dc:latest
+        chdir: "{{ build_dir }}/meta"
