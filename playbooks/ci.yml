@@ -10,7 +10,7 @@
     galaxy_hub: 'tusldanshub01.unisource.corp'
     collection_namespace: 'tep'
     collection_name: 'dc'
-    collection_version: '1.0.0'
+    collection_version: '1.0.1'
 
   tasks:
     - name: Install dependencies
@@ -49,5 +49,5 @@
     
     - name: Build execution environment
       ansible.builtin.command:
-        cmd: ansible-builder build --tag {{ galaxy_hub }}/tep_dc:latest
+        cmd: ansible-builder build --tag {{ galaxy_hub }}/tep_dc
         chdir: "{{ build_dir }}/meta"
