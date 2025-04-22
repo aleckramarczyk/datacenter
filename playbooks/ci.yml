@@ -48,6 +48,8 @@
           cmd: ansible-galaxy collection publish {{ build_dir }}/{{ collection_namespace }}-{{ collection_name }}-{{ collection_version }}.tar.gz -s https://{{ galaxy_hub }}/api/galaxy --api-key {{ galaxy_api_key }}
           chdir: "{{ build_dir }}"
         tags: publish
+        register: publish_result
+        failed_when: Collection has been successfully published not in publish_result.stdout
       
       - name: Build execution environment
         ansible.builtin.command:
