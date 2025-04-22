@@ -28,6 +28,7 @@
       - name: Set vars
         set_fact: 
           git_url: 'https://{{ git_user| urlencode }}:{{ git_pass | urlencode }}@{{ git_repo }}'
+        tags: clone
       
       - name: Clone repo
         ansible.builtin.git:
@@ -35,6 +36,7 @@
           dest: "{{ build_dir }}"
           version: "{{ git_branch }}"
           force: yes
+        tags: clone
       
       - name: Build collection
         ansible.builtin.command:
@@ -42,6 +44,7 @@
           chdir: "{{ build_dir }}"
         register: build_result
         failed_when: build_result.rc != 0
+        tags: build
       
       - name: Publish collection
         ansible.builtin.command:

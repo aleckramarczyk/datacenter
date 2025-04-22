@@ -9,8 +9,7 @@ dependencies:
     package_pip: ansible-runner
   galaxy:
     collections:
-      - name: tep.dc
-        source: mycollections/tep-dc-1.0.1.tar.gz
+      - source: mycollections/tep-dc-1.0.1.tar.gz
         type: file
 
 options:
@@ -21,4 +20,4 @@ additional_build_steps:
 
 additional_build_files:
   - dest: mycollections/tep-dc-1.0.1.tar.gz
-    src: tep-dc-1.0.1.tar.gz
+    src: ../tep-dc-1.0.1.tar.gz
