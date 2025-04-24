@@ -18,7 +18,6 @@ readme: README.md
 authors:
 - Alec Kramarczyk <alec.kramarczyk@tep.com>
 
-
 ### OPTIONAL but strongly recommended
 # A short summary description of the collection
 description: "Collection of Ansible content for data center network automation"
@@ -40,8 +39,7 @@ tags: []
 # collection label 'namespace.name'. The value is a version range
 # L(specifiers,https://python-semanticversion.readthedocs.io/en/latest/#requirement-specification). Multiple version
 # range specifiers can be set and are separated by ','
-dependencies: 
-  cisco.aci: '>=2.10.1'
+dependencies: {}
 
 # The URL of the originating SCM repository
 repository: httsp://git.uns.co/InformationServices/tep_dc
