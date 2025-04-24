@@ -1,7 +1,17 @@
 ---
-# tasks file for aci
+- name: Deploy fabric nodes
+  ansible.builtin.include_tasks:
+    file: nodes.yml
+    apply:
+      tags: nodes
+  tags: nodes
+
 - name: Deploy access policies
-  ansible.builtin.include_tasks: access_policies.yml
+  ansible.builtin.include_tasks:
+    file: access_policies.yml
+    apply:
+      tags: access_policies
+  tags: access_policies
 
 - name: Configure access ports
   tags: configure_access_ports

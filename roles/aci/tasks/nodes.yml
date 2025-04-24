@@ -1,0 +1,32 @@
+---
+- name: Set ACI connection parameters
+  ansible.builtin.set_fact:
+    aci_login: &aci_login
+      host: "{{ apic }}"
+      username: "{{ aci_username }}"
+      password: "{{ aci_password }}"
+      validate_certs: "{{ aci_validate_certs }}"
+
+- name: Add fabric leaf
+  cisco.aci.aci_fabric_node:
+    <<: *aci_login
+    pod_id: "{{ item.pod }}"
+    node_id: "{{ item.id }}"
+    serial: "{{ item.serial }}"
+    switch: "{{ item.name }}"
+    state: present
+  loop: "{{ aci_leaves }}"
+  when: item.state is not defined or item.state == 'present'
+  loop_control:
+    label: "{{ item.id }}: {{ item.name }}"
+
+- name: Remove fabric leaf
+  cisco.aci.aci_fabric_node:
+    <<: *aci_login
+    node_id: "{{ item.id }}"
+    serial: "{{ item.serial }}"
+    state: absent
+  loop: "{{ aci_leaves }}"
+  when: item.state is defined and item.state == 'absent'
+  loop_control:
+    label: "{{ item.id }}: {{ item.name }}"

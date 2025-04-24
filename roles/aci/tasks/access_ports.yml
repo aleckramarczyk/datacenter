@@ -6,10 +6,6 @@
       password: "{{ aci_password }}"
       validate_certs: "{{ aci_validate_certs }}"
 
-- name: Debug access configs
-  ansible.builtin.debug:
-    var: aci_access_configs
-
 - name: Parse Access Configs
   ansible.builtin.set_fact:
     filtered_access_configs: "{{ aci_access_configs | tep.dc.access_config_filter }}"
