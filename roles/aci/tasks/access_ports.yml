@@ -86,7 +86,7 @@
   when: item.locate
   loop_control:
     label: "{{ item.name }}"
-  label: locate
+  tags: locate
 
 - name: Disable locator LED
   cisco.aci.aci_rest:
@@ -108,7 +108,7 @@
   when: not item.locate
   loop_control:
     label: "{{ item.name }}"
-  label: locate
+  tags: locate
 
 - name: Deploy VPC Interface Policy Groups
   cisco.aci.aci_interface_policy_leaf_policy_group:
