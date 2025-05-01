@@ -14,8 +14,8 @@
   tags: access_policies
 
 - name: Configure access ports
-  tags: configure_access_ports
+  tags: access_ports
   ansible.builtin.include_tasks:
     file: access_ports.yml
     apply:
-      tags: configure_access_ports
+      tags: access_ports
