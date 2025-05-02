@@ -1,6 +1,0 @@
----
-- name: Configure ACI hiii111!!
-  hosts: all
-  roles:
-    - tep.dc.aci
-  gather_facts: false
