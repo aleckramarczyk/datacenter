@@ -1,4 +1,20 @@
 ---
+- name: Create a fabric config snapshot
+  cisco.aci.aci_config_snapshot:
+    host: "{{ apic }}"
+    username: "{{ aci_username }}"
+    password: "{{ aci_password }}"
+    validate_certs: "{{ aci_validate_certs }}"
+    state: present
+    export_policy: config_backup
+    description: "Ansible Config Deployment {{ now(utc=true, fmt='%Y-%m-%d %H:%M:%S') }}"
+  tags: snapshot
+
+- name: Wait for snapshot to complete
+  ansible.builtin.pause:
+    seconds: 20
+  tags: snapshot
+
 - name: Deploy fabric nodes
   ansible.builtin.include_tasks:
     file: nodes.yml
@@ -12,6 +28,10 @@
     apply:
       tags: access_policies
   tags: access_policies
+
+- name: Parse Access Configs
+  ansible.builtin.set_fact:
+    filtered_access_configs: "{{ aci_access_configs | aleckramarczyk.datacenter.access_config_filter }}"
 
 - name: Configure access ports
   tags: access_ports
