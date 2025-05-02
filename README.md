@@ -1,3 +1,3 @@
-# Ansible Collection - tep.dc
+# Ansible Collection - aleckramarczyk.datacenter
 
 Documentation for the collection.
